@@ -1,87 +1,108 @@
+#Importing socket module
 import socket
-import rsa
-import pickle
+#Importing Encryption module
+from encryption import Encryption
+#Importing Thread for multithreading
 from threading import Thread
 
+#Client class
 class Client:
+    #Constructor
     def __init__(self, ip='127.0.0.1', port=55555):
-        # generate public and private keys with
-        # rsa.newkeys method,this method accepts
-        # key length as its parameter
-        # key length should be atleast 16
-        self.publicKey, self.privateKey = rsa.newkeys(512)
+        # Creating the encryption object
+        self.encryption = Encryption()
+        #Creating the socket object
         self.socket = socket.socket()
+        #creating the address and port variable
         self.addr = (ip, port)
+        # default disconnect callback
+        # i.e. when server closes this method is called
         self.disconnectCallback = None
+        # default message callback
+        # i.e. when new message is received this method is called
         self.callback = None
+        # default connected callback
+        # i.e. when server connected this method is called
         self.connectedCallback = None
+        #This is for denoting if the connection is active
         self.connected = False
 
+    #Method to start the client socket
     def start(self):
         try:
+            #Connecting to the server socket
             self.socket.connect(self.addr)
 
-            self.serverPublicKey = pickle.loads(self.socket.recv(1024))
-            self.socket.send(pickle.dumps(self.publicKey))
+            #Local encryption key
+            encryptionKey = self.encryption.getPickledEncryptionKey()
 
+            #Doing Handshake
+            ##Getting the encryption of the server
+            self.encryption.setPickledEncryptionKey(self.socket.recv(1024))
+            ##Sending the encryption to the server
+            self.socket.send(encryptionKey)
+
+            #Calling the callback function for connected status
             self.connected = True
             self.callConnected()
 
+            #Starting new thread for receiving message
             Thread(target=self.receive, args=(self.callback,)).start()
 
         except Exception as err:
+            #Printing error message
             print(err)
+            #Cloding the socket
             self.close()
+            #Calling the disconnect callback method
             self.callDisconnect()
             return
 
-
-    #Method to encrypt the message
-    def encrypt(self, txt):
-        try:
-            return rsa.encrypt(txt.encode(), self.serverPublicKey)
-        except Exception as err:
-            return txt.encode()
-
-    #Method to decrypt the encrypted message
-    def decrypt(self, encTxt):
-        try:
-            return rsa.decrypt(encTxt, self.privateKey).decode()
-        except:
-            return encTxt
-
+    #Method for receiving the message from the server
     def receive(self, callback):
         while self.connected:
             try:
                 message = self.socket.recv(1024)
-                decTxt = self.decrypt(message)
+                #Decrypting the message
+                decTxt = self.encryption.decrypt(message)
+                #Calling the callback function for message
                 callback(decTxt)
             except:
+                #calling the disconnect callback method
                 self.callDisconnect()
                 break
 
+    #Method to set message receiving callback method
     def setOnMessage(self, callback):
         self.callback = callback
 
+    #Method to set disconnected callback method
     def setOnDisconnect(self, callback):
         self.disconnectCallback = callback
 
+    #Method to set connected callback method
     def setOnConnect(self, callback):
         self.connectedCallback = callback
 
+    #Method to call disconnect callback method
     def callDisconnect(self):
         if self.disconnectCallback:
             self.disconnectCallback()
         self.close()
 
+    #Method to call connect callback method
     def callConnected(self):
         if self.connectedCallback:
             self.connectedCallback()
 
+    #Method to send the message to the server
     def send(self, message):
-        encTxt = self.encrypt(message)
+        #Encrypting the message
+        encTxt = self.encryption.encrypt(message)
+        #Sending the message to the server
         self.socket.send(encTxt)
 
+    #Mthod to close the socket
     def close(self):
         self.connected = False
         self.socket.close()

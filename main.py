@@ -229,5 +229,7 @@ class ChatWindow:
         self.root.destroy()
         self.socket.close()
 
-main = ChatWindow()
-main.start()
+if __name__ == "__main__":
+    #Running the application
+    main = ChatWindow()
+    main.start()

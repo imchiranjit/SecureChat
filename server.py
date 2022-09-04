@@ -44,9 +44,9 @@ class Server:
 
                 #Doing Handshake
                 ##Sending the encryption to the client
-                client.send(self.encryption.getPickledEncryptionKey())
+                client.send(self.encryption.getSerializedEncryptionKey())
                 ##Getting the encryption of the client
-                self.encryption.setPickledEncryptionKey(client.recv(1024))
+                self.encryption.setSerializedEncryptionKey(self.recvall())
 
                 #Starting new thread for receiving message
                 Thread(target=self.receive, args=(self.callback,)).start()
@@ -67,7 +67,7 @@ class Server:
     def receive(self, callback):
         while self.open:
             try:
-                message = self.client.recv(1024)
+                message = self.recvall()
                 #Decrypting the message
                 decTxt = self.encryption.decrypt(message)
                 #Calling the callback function for message
@@ -77,6 +77,18 @@ class Server:
                 self.callDisconnect()
                 #Printing the error message
                 break
+
+    #Method to receive entire buffer from the socket
+    def recvall(self):
+        BUFF_SIZE = 1024 # 1 KiB
+        data = b''
+        while True:
+            part = self.client.recv(BUFF_SIZE)
+            data += part
+            if len(part) < BUFF_SIZE:
+                # either 0 or end of data
+                break
+        return data
 
     # def receive(self, callback):
     #     while self.open:

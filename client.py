@@ -34,11 +34,11 @@ class Client:
             self.socket.connect(self.addr)
 
             #Local encryption key
-            encryptionKey = self.encryption.getPickledEncryptionKey()
+            encryptionKey = self.encryption.getSerializedEncryptionKey()
 
             #Doing Handshake
             ##Getting the encryption of the server
-            self.encryption.setPickledEncryptionKey(self.socket.recv(1024))
+            self.encryption.setSerializedEncryptionKey(self.recvall())
             ##Sending the encryption to the server
             self.socket.send(encryptionKey)
 
@@ -62,7 +62,7 @@ class Client:
     def receive(self, callback):
         while self.connected:
             try:
-                message = self.socket.recv(1024)
+                message = self.recvall()
                 #Decrypting the message
                 decTxt = self.encryption.decrypt(message)
                 #Calling the callback function for message
@@ -71,6 +71,18 @@ class Client:
                 #calling the disconnect callback method
                 self.callDisconnect()
                 break
+
+    #Method to receive entire buffer from the socket
+    def recvall(self):
+        BUFF_SIZE = 1024 # 1 KiB
+        data = b''
+        while True:
+            part = self.socket.recv(BUFF_SIZE)
+            data += part
+            if len(part) < BUFF_SIZE:
+                # either 0 or end of data
+                break
+        return data
 
     #Method to set message receiving callback method
     def setOnMessage(self, callback):
